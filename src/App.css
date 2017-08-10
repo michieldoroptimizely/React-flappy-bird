@@ -22,3 +22,23 @@
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+.game-content {
+  margin: auto;
+  display: block;
+  position: relative;
+  border: 1px solid #ccc;
+  overflow: hidden;
+}
+
+.bird {
+  background: red;
+  height: 40px;
+  width: 40px;
+  position: absolute;
+  margin: auto;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+}
