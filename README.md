@@ -1,4 +1,5 @@
-### React-flappy-bird
+## React-flappy-bird
+
 > How to play:
 - npm i
 - doubleclick start.bat
