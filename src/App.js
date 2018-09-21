@@ -1,4 +1,5 @@
 import React, { Component } from 'react';
+import { setRafInterval, clearRafInterval } from './util/raf-interval';
 import './App.css';
 
 const requireContext = require.context("./flappybird", true, /^\.\/.*\.png$/);
@@ -7,7 +8,7 @@ const images = keys.map(requireContext);
 const map = {};
 
 
-class bg {
+class Bg {
     constructor(config) {
       let canvas = document.getElementById('canvas'),
           ctx = canvas.getContext('2d');
@@ -41,7 +42,7 @@ class bg {
     }
 }
 
-class bird {
+class Bird {
     constructor(config) {
       config = config || {};
       this.init(config);
@@ -77,6 +78,37 @@ class bird {
     }
 }
 
+class Hud {
+  constructor(config) {
+    config = config || {};
+    this.init(config);
+  }
+  init(config) {
+    const type = config.type || 'start',
+          canvas = document.getElementById('canvas'),
+          ctx = canvas.getContext('2d');
+    this.ctx = ctx;
+    switch (type) {
+      case 'start':
+        this.drawTitle(this.initImg('title'));
+        this.drawContent(this.initImg('tutorial'));
+        break;
+    
+      default:
+        break;
+    }
+  }
+  drawTitle(img, x = 55, y = 100) {
+    this.ctx.drawImage(img, x, y);
+  }
+  drawContent(img, x = 87, y = 200) {
+    this.ctx.drawImage(img, x, y);
+  }
+  initImg(key) {
+    return map[key];
+  }
+}
+
 class App extends Component {
   constructor(props) {
     super(props);
@@ -105,7 +137,8 @@ class App extends Component {
       pos: {//飞行位置
         top: 232,
         left: 100
-      }
+      },
+      gameover: false,
     };
     this.handleChange = this.handleChange.bind(this);
     this.handleKeyUp = this.handleKeyUp.bind(this);
@@ -115,7 +148,7 @@ class App extends Component {
   }
   componentWillUpdate() {
     // console.log('update');
-    this.birdObj.clear();
+    if (!this.birdObj) return;
     this.bgObj.init({
       land: this.state.land,
       pipespace: this.state.pipespace,
@@ -139,21 +172,21 @@ class App extends Component {
     });
   }
   initCanvas() {
-    this.bgObj = new bg({
+    this.bgObj = new Bg({
       land: this.state.land,
       pipespace: this.state.pipespace,
       pipe: this.state.pipe
     });
-    this.birdObj = new bird({x:this.state.pos.left, y:this.state.pos.top, img: this.state.img});//将唯一bird实例birdObj赋予上下文
-    this.initEngine();
+    this.hudObj = new Hud();
   }
   initEngine() {//游戏主引擎和操作事件
-    window.addEventListener('keyup',this.handleKeyUp);//绑定键盘事件触发拍打翅膀
+    window.addEventListener('keyup', this.handleKeyUp);//绑定键盘事件触发拍打翅膀
+    window.document.getElementById('canvas').addEventListener('mousedown', this.handleKeyUp);//绑定触摸、点击事件触发拍打翅膀
     this.timer1 = this.setFlyInterval.call(this);//切换翅膀拍动位置
     this.timer2 = this.setRunInterval.call(this);//游戏运行主要方法
   }
   setFlyInterval() {
-    return setInterval(() => {
+    return setRafInterval(() => {
       this.setState({
         img: this.state.img < 2 ? this.state.img + 1 : 0
       });
@@ -161,7 +194,7 @@ class App extends Component {
   }
   setRunInterval() {
     let time = 1 / this.state.frames;
-    return setInterval(() => {
+    return setRafInterval(() => {
       let v = this.state.velocity + this.state.g * time;
       let pipe = this.state.pipe;
       if(pipe[0].x >> 0 < -52) {
@@ -182,8 +215,8 @@ class App extends Component {
         }
       });
       if(this.state.pos.left + 38 >= this.state.pipe[0].x && this.checkGameover.call(this)){
-        clearInterval(this.timer1);
-        clearInterval(this.timer2);
+        clearRafInterval(this.timer1);
+        clearRafInterval(this.timer2);
       }
     },time * 1000);
   }
@@ -215,25 +248,77 @@ class App extends Component {
         break;
       }
     }
+    gameover && this.setState({
+      gameover: true,
+    })
     return gameover;
   }
-  handleChange(event) {
+  handleChange(event, key = 'value') {
+    if (/\./.test(key)) {
+      const baseStateName = key.split('.')[0];
+      const childStateName = key.split('.')[1];
+      this.setState({
+        [baseStateName]: {
+          ...this.state[baseStateName],
+          [childStateName]: +event.target.value,
+        }
+      });
+      return;
+    }
     this.setState({
-      value: event.target.value
+      [key]: +event.target.value || event.target.value,
     });
   }
   handleKeyUp(event) {
-    if(event.keyCode === 38) {
+    if(event.keyCode === 38 || event.type === 'mousedown') {
       this.setState({
         velocity: -4
       });
     }
   }
+  start = () => {
+    if(this.state.velocity) return;
+    this.birdObj = new Bird({ x: this.state.pos.left, y: this.state.pos.top, img: this.state.img });//将唯一bird实例birdObj赋予上下文
+    this.initEngine();
+  }
+  restart = () => {
+    this.setState({
+      pos: {//飞行位置
+        top: 232,
+        left: 100
+      },
+      pipe: [{//障碍物位置
+        x: 500,
+        y: Math.random() * -260 - 40
+      }, {
+        x: 500 + 118 + 52,
+        y: Math.random() * -260 - 40
+      }, {
+        x: 500 + 118 * 2 + 52 * 2,
+        y: Math.random() * -260 - 40
+      }],
+      velocity: 0,//速度
+      gameover: false,
+    });
+    this.initEngine();
+  }
   render() {
+    const { gameover, pipespace, g } = this.state;
     return (
       <div className="App" >
-        <input value = {this.state.value} onChange = {this.handleChange} />
-        <canvas id="canvas" className="game-content" width="288" height="512"></canvas>
+        <form className="param-form">
+          <button onClick={this.restart} type="button">RESTART</button>
+          <input value={this.state.value} onChange={(e) => this.handleChange(e, 'value')} />
+          pipespace.x:<input type="range" value={pipespace.x} max="300" onChange={(e) => this.handleChange(e, 'pipespace.x')} />
+          pipespace.y:<input type="range" value={pipespace.y} max="300" onChange={(e) => this.handleChange(e, 'pipespace.y')} />
+          g:<input type="range" value={g} max="20" onChange={(e) => this.handleChange(e, 'g')} />
+        </form>
+        <div className="game-container">
+          {
+            gameover ? <div className="gameover-modal"></div> : null
+          }
+          <canvas id="canvas" className="game-content" width="288" height="512" onClick={this.start}></canvas>
+        </div>
       </div>
     );
   }
