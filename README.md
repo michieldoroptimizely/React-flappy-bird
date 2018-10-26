@@ -5,4 +5,4 @@
 - doubleclick start.bat
 - press up to let the bird jump
 > Description:
-> drew the game with Canvas , trying using React.js
+> drew the game with Canvas , trying using React.js!!
